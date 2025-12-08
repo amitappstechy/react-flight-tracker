@@ -46,6 +46,16 @@ export default function Home() {
     }
   };
 
+  const generateCalendarUrl = (flight: Flight) => {
+    const title = `Flight ${flight.flightNumber} to ${flight.arrival.location}`;
+    const start = flight.departure.time.replace(/[-:.]/g, '');
+    const end = flight.arrival.time.replace(/[-:.]/g, '');
+    const details = `Flight: ${flight.airline} ${flight.flightNumber}\nStatus: ${flight.status}\nRoute: ${flight.departure.airport} to ${flight.arrival.airport}`;
+    const location = `${flight.departure.location} to ${flight.arrival.location}`;
+
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
+  };
+
   return (
     <main className="container">
       <div className="header-container">
@@ -76,38 +86,46 @@ export default function Home() {
 
       <div className="results">
         {flights?.map((flight) => (
-          <div key={flight.id} className="card">
-            <div className="flight-header">
-              <div>
-                <div className="flight-number">{flight.flightNumber}</div>
-                <div className="airline">{flight.airline}</div>
+          <a
+            key={flight.id}
+            href={generateCalendarUrl(flight)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="card-link"
+          >
+            <div className="card">
+              <div className="flight-header">
+                <div>
+                  <div className="flight-number">{flight.flightNumber}</div>
+                  <div className="airline">{flight.airline}</div>
+                </div>
+                <div className={`status ${getStatusClass(flight.status)}`}>
+                  {flight.status}
+                </div>
               </div>
-              <div className={`status ${getStatusClass(flight.status)}`}>
-                {flight.status}
+
+              <div className="flight-route">
+                <div className="location-info">
+                  <div className="airport-code">{flight.departure.airport}</div>
+                  <div className="city">{flight.departure.location}</div>
+                  <div className="time">{formatTime(flight.departure.time)}</div>
+                  <div className="timezone">{flight.departure.timezone}</div>
+                </div>
+
+                <div className="duration-line">
+                  <span className="duration-text">{flight.duration}</span>
+                  <span className="plane-icon">✈</span>
+                </div>
+
+                <div className="location-info end">
+                  <div className="airport-code">{flight.arrival.airport}</div>
+                  <div className="city">{flight.arrival.location}</div>
+                  <div className="time">{formatTime(flight.arrival.time)}</div>
+                  <div className="timezone">{flight.arrival.timezone}</div>
+                </div>
               </div>
             </div>
-
-            <div className="flight-route">
-              <div className="location-info">
-                <div className="airport-code">{flight.departure.airport}</div>
-                <div className="city">{flight.departure.location}</div>
-                <div className="time">{formatTime(flight.departure.time)}</div>
-                <div className="timezone">{flight.departure.timezone}</div>
-              </div>
-
-              <div className="duration-line">
-                <span className="duration-text">{flight.duration}</span>
-                <span className="plane-icon">✈</span>
-              </div>
-
-              <div className="location-info end">
-                <div className="airport-code">{flight.arrival.airport}</div>
-                <div className="city">{flight.arrival.location}</div>
-                <div className="time">{formatTime(flight.arrival.time)}</div>
-                <div className="timezone">{flight.arrival.timezone}</div>
-              </div>
-            </div>
-          </div>
+          </a>
         ))}
       </div>
 
