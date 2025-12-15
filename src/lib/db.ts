@@ -11,6 +11,7 @@ interface Airline {
 interface Airport {
     airportId: number;
     codeIataAirport: string; // "JFK"
+    codeIataCity?: string; // "NYC"
     nameAirport: string; // "John F Kennedy Intl"
     codeIso2Country: string; // "US"
     latitudeAirport: number;
@@ -57,6 +58,22 @@ export function getAirports(): Airport[] {
 export function findAirline(code: string): Airline | undefined {
     const airlines = getAirlines();
     return airlines.find(a => a.codeIataAirline === code.toUpperCase());
+}
+
+export function findAirlineByName(name: string): Airline | undefined {
+    const airlines = getAirlines();
+    const lowerName = name.toLowerCase();
+    return airlines.find(a => a.nameAirline.toLowerCase().includes(lowerName));
+}
+
+export function findAirportByCity(city: string): Airport | undefined {
+    const airports = getAirports();
+    const lowerCity = city.toLowerCase();
+    // Return the first match for the city simulation
+    return airports.find(a =>
+        (a.codeIataCity && a.codeIataCity.toLowerCase() === lowerCity) ||
+        (a.nameAirport && a.nameAirport.toLowerCase().includes(lowerCity))
+    );
 }
 
 export function getRandomAirports(count: number = 2): Airport[] {

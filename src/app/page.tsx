@@ -13,6 +13,7 @@ export default function Home() {
 
   const [error, setError] = useState('');
   const [searchHistory, setSearchHistory] = useState<Flight[]>([]);
+  const [date, setDate] = useState('');
 
   const formatTime = (iso: string) => {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -38,31 +39,68 @@ export default function Home() {
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
   };
 
-  const performSearch = async (flightNum: string) => {
-    if (!flightNum.trim()) return;
+  const performSearch = async (flightNumOrQuery: string) => {
+    if (!flightNumOrQuery.trim()) return;
 
     setLoading(true);
     setError('');
     setFlights(null);
 
     try {
-      const res = await fetch(`/api/flights?flightNumber=${encodeURIComponent(flightNum)}`);
+      // Determine if simple flight number or parsing needed
+      // Simple logic: if it has spaces or doesn't look like XX123, try AI
+      const isSimpleFlightNum = /^[A-Z0-9]{2,3}\d{1,4}$/i.test(flightNumOrQuery.trim());
+
+      let searchParams = new URLSearchParams();
+
+      if (isSimpleFlightNum) {
+        searchParams.set('flightNumber', flightNumOrQuery.trim());
+      } else {
+        // Call AI Endpoint
+        const aiRes = await fetch('/api/ai-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: flightNumOrQuery })
+        });
+
+        if (!aiRes.ok) throw new Error('AI processing failed');
+
+        const aiData = await aiRes.json();
+
+        // Map AI result to Search Params
+        if (aiData.flightNumber) searchParams.set('flightNumber', aiData.flightNumber);
+        if (aiData.airline) searchParams.set('airline', aiData.airline);
+        if (aiData.destination) searchParams.set('destination', aiData.destination);
+
+        if (!aiData.flightNumber && !aiData.airline && !aiData.destination) {
+          throw new Error('Sorry, I couldn\'t understand that flight query.');
+        }
+      }
+
+      if (date) {
+        searchParams.set('date', date);
+      }
+
+      const res = await fetch(`/api/flights?${searchParams.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch flights');
       const data = await res.json();
       setFlights(data);
       if (data.length === 0) {
-        setError('No flights found with that number');
+        setError('No flights found matching your request.');
       } else {
         setSearchHistory(prev => {
-          const flight = data[0]; // Assuming single flight result
-          // Remove if it exists (by flight number equality) to move to top
+          const flight = data[0];
+          // Use query string for history display if it was an AI search? 
+          // Or just store the resolved flight? 
+          // Current history logic stores full flights, which is good.
+          // Just unshift resolved flight.
           const filtered = prev.filter(h => h.flightNumber !== flight.flightNumber);
           const newHistory = [flight, ...filtered];
           return newHistory.slice(0, 5);
         });
       }
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -87,13 +125,21 @@ export default function Home() {
       </div>
 
       <form onSubmit={onFormSubmit} className="search-container">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Enter Flight Number (e.g. AA999)..."
-          className="search-input"
-        />
+        <div className="search-fields">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Try 'AA999' or 'American to London'..."
+            className="search-input"
+          />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="date-input"
+          />
+        </div>
         <button type="submit" className="search-button" disabled={loading}>
           {loading ? 'Searching...' : 'Track'}
         </button>
