@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { findAirline, getRandomAirports } from '../../../lib/db';
 
 export interface Flight {
     id: string;
     flightNumber: string;
     airline: string;
-    status: 'On Time' | 'Delayed' | 'Cancelled' | 'Arrived';
+    status: 'On Time' | 'Delayed' | 'Cancelled' | 'Arrived' | 'In Air';
     departure: {
         location: string;
         airport: string;
@@ -20,100 +21,57 @@ export interface Flight {
     duration: string;
 }
 
-const MOCK_FLIGHTS: Flight[] = [
-    {
-        id: '1',
-        flightNumber: 'AA123',
-        airline: 'American Airlines',
-        status: 'On Time',
-        departure: {
-            location: 'New York, NY',
-            airport: 'JFK',
-            time: '2025-12-08T14:00:00',
-            timezone: 'America/New_York',
-        },
-        arrival: {
-            location: 'London, UK',
-            airport: 'LHR',
-            time: '2025-12-09T02:00:00',
-            timezone: 'Europe/London',
-        },
-        duration: '7h 0m',
-    },
-    {
-        id: '2',
-        flightNumber: 'BA456',
-        airline: 'British Airways',
-        status: 'Delayed',
-        departure: {
-            location: 'London, UK',
-            airport: 'LHR',
-            time: '2025-12-08T16:30:00',
-            timezone: 'Europe/London',
-        },
-        arrival: {
-            location: 'Paris, FR',
-            airport: 'CDG',
-            time: '2025-12-08T18:45:00',
-            timezone: 'Europe/Paris',
-        },
-        duration: '1h 15m',
-    },
-    {
-        id: '3',
-        flightNumber: 'JL789',
-        airline: 'Japan Airlines',
-        status: 'In Air',
-        departure: {
-            location: 'Tokyo, JP',
-            airport: 'HND',
-            time: '2025-12-08T10:00:00',
-            timezone: 'Asia/Tokyo',
-        },
-        arrival: {
-            location: 'San Francisco, CA',
-            airport: 'SFO',
-            time: '2025-12-08T08:30:00', // Arrives "before" it leaves due to timezone
-            timezone: 'America/Los_Angeles',
-        },
-        duration: '9h 30m',
-    },
-    {
-        id: '4',
-        flightNumber: 'UA101',
-        airline: 'United Airlines',
-        status: 'On Time',
-        departure: {
-            location: 'San Francisco, CA',
-            airport: 'SFO',
-            time: '2025-12-09T09:00:00',
-            timezone: 'America/Los_Angeles',
-        },
-        arrival: {
-            location: 'New York, NY',
-            airport: 'JFK',
-            time: '2025-12-09T17:30:00',
-            timezone: 'America/New_York',
-        },
-        duration: '5h 30m',
-    }
-];
-
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('flightNumber');
+    const query = searchParams.get('flightNumber'); // e.g., "AA123"
 
     if (!query) {
-        return NextResponse.json(MOCK_FLIGHTS);
+        return NextResponse.json([]);
     }
 
-    const flight = MOCK_FLIGHTS.find((f) =>
-        f.flightNumber.toLowerCase() === query.toLowerCase()
-    );
+    // 1. Parse Airline Code (First 2 chars approx)
+    // Simple logic: Take first 2 letters. 
+    const airlineCode = query.substring(0, 2).toUpperCase();
+    const flightNumberPart = query.substring(2);
 
-    if (flight) {
-        return NextResponse.json([flight]);
+    const airline = findAirline(airlineCode);
+
+    if (!airline) {
+        return NextResponse.json([]);
     }
 
-    return NextResponse.json([]);
+    // 2. Get Random Airports for route
+    const airports = getRandomAirports(2);
+    if (airports.length < 2) {
+        return NextResponse.json([]);
+    }
+    const depAirport = airports[0];
+    const arrAirport = airports[1];
+
+    // 3. Construct Flight Object
+    const now = new Date();
+    const depTime = new Date(now.getTime() + 3600000 * 2); // +2 hours
+    const arrTime = new Date(now.getTime() + 3600000 * 8); // +8 hours
+
+    const flight: Flight = {
+        id: `real-${Date.now()}`,
+        flightNumber: `${airline.codeIataAirline}${flightNumberPart}`,
+        airline: airline.nameAirline, // Real Name from DB!
+        status: 'On Time',
+        departure: {
+            location: depAirport.codeIso2Country, // Using Country Code as City for now as City DB link is complex
+            airport: depAirport.codeIataAirport,
+            time: depTime.toISOString(),
+            timezone: depAirport.timezone,
+        },
+        arrival: {
+            location: arrAirport.codeIso2Country,
+            airport: arrAirport.codeIataAirport,
+            time: arrTime.toISOString(),
+            timezone: arrAirport.timezone,
+        },
+        duration: '6h 0m'
+    };
+
+    return NextResponse.json([flight]);
 }

@@ -4,33 +4,15 @@ import { useState } from 'react';
 import Image from 'next/image';
 import type { Flight } from './api/flights/route';
 import FlightLog from './components/FlightLog';
+import SearchHistory from './components/SearchHistory';
 
 export default function Home() {
   const [query, setQuery] = useState('');
   const [flights, setFlights] = useState<Flight[] | null>(null);
   const [loading, setLoading] = useState(false);
+
   const [error, setError] = useState('');
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
-    setLoading(true);
-    setError('');
-    setFlights(null);
-
-    try {
-      const res = await fetch(`/api/flights?flightNumber=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error('Failed to fetch flights');
-      const data = await res.json();
-      setFlights(data);
-      if (data.length === 0) setError('No flights found with that number');
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [searchHistory, setSearchHistory] = useState<Flight[]>([]);
 
   const formatTime = (iso: string) => {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -56,6 +38,41 @@ export default function Home() {
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
   };
 
+  const performSearch = async (flightNum: string) => {
+    if (!flightNum.trim()) return;
+
+    setLoading(true);
+    setError('');
+    setFlights(null);
+
+    try {
+      const res = await fetch(`/api/flights?flightNumber=${encodeURIComponent(flightNum)}`);
+      if (!res.ok) throw new Error('Failed to fetch flights');
+      const data = await res.json();
+      setFlights(data);
+      if (data.length === 0) {
+        setError('No flights found with that number');
+      } else {
+        setSearchHistory(prev => {
+          const flight = data[0]; // Assuming single flight result
+          // Remove if it exists (by flight number equality) to move to top
+          const filtered = prev.filter(h => h.flightNumber !== flight.flightNumber);
+          const newHistory = [flight, ...filtered];
+          return newHistory.slice(0, 5);
+        });
+      }
+    } catch (err) {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    performSearch(query);
+  };
+
   return (
     <main className="container">
       <div className="header-container">
@@ -69,12 +86,12 @@ export default function Home() {
         <h1 className="title">AppsTechy Flight Booking Portal</h1>
       </div>
 
-      <form onSubmit={handleSearch} className="search-container">
+      <form onSubmit={onFormSubmit} className="search-container">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Enter Flight Number (e.g. AA123)..."
+          placeholder="Enter Flight Number (e.g. AA999)..."
           className="search-input"
         />
         <button type="submit" className="search-button" disabled={loading}>
@@ -108,7 +125,7 @@ export default function Home() {
                 <div className="location-info">
                   <div className="airport-code">{flight.departure.airport}</div>
                   <div className="city">{flight.departure.location}</div>
-                  <div className="time">{formatTime(flight.departure.time)}</div>
+                  <div className="time" suppressHydrationWarning>{formatTime(flight.departure.time)}</div>
                   <div className="timezone">{flight.departure.timezone}</div>
                 </div>
 
@@ -120,7 +137,7 @@ export default function Home() {
                 <div className="location-info end">
                   <div className="airport-code">{flight.arrival.airport}</div>
                   <div className="city">{flight.arrival.location}</div>
-                  <div className="time">{formatTime(flight.arrival.time)}</div>
+                  <div className="time" suppressHydrationWarning>{formatTime(flight.arrival.time)}</div>
                   <div className="timezone">{flight.arrival.timezone}</div>
                 </div>
               </div>
@@ -128,6 +145,11 @@ export default function Home() {
           </a>
         ))}
       </div>
+
+      <SearchHistory history={searchHistory} onSelect={(flightNumber) => {
+        setQuery(flightNumber);
+        performSearch(flightNumber);
+      }} />
 
       <FlightLog />
     </main>

@@ -57,8 +57,8 @@ export default function FlightLog() {
                 {MOCK_LOGS.map((log) => (
                     <div key={log.id} className="log-item">
                         <div className="log-date">
-                            <span className="day">{new Date(log.date).getDate()}</span>
-                            <span className="month">{new Date(log.date).toLocaleDateString('en-US', { month: 'short' })}</span>
+                            <span className="day" suppressHydrationWarning>{new Date(log.date).getDate()}</span>
+                            <span className="month" suppressHydrationWarning>{new Date(log.date).toLocaleDateString('en-US', { month: 'short' })}</span>
                         </div>
 
                         <div className="log-details">
